@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""LLM Coder v1.0
+
+Copyright (c) 2024 Andrew Northall <andrew@northall.me.uk>
+https://github.com/anorthall/llm-coder
+
+Licenced under the MIT Licence.
+"""
+
+import os
+import argparse
+import glob
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+from sys import platform
+
+
+BASE_PROMPT = """You are an expert software engineer and you are consulting for a client.
+
+I will now show you a series of files which are part of the client's project. They require your expert opinion. You will be shown each file along with the path to the file.
+
+The client will present their questions afterwards and you must answer them to the best of your ability and be sure to mention any flaws that you find in the code, or anything that you feel the client may not be considering architecturally.
+
+If necessary, you may need to refactor the code. You will be asked to provide the refactored code in full, on a per-file basis.
+
+You may need to suggest an entirely different solution to the client's problem, not utilizing the code provided.
+
+You will be paid for your time, so be honest and give the client your full expert opinion.
+
+# Code to review
+""".strip()
+
+
+ACCEPTED_MARKDOWN_FILE_EXT = {
+    "json": ["json"],
+    "python": ["py"],
+    "shell": ["sh"],
+    "yaml": ["yaml", "yml"],
+    "xml": ["xml"],
+    "markdown": ["md"],
+    "text": ["txt"],
+    "csv": ["csv"],
+    "html": ["html"],
+    "css": ["css"],
+    "javascript": ["js"],
+    "typescript": ["ts"],
+    "sql": ["sql"],
+    "java": ["java"],
+    "c": ["c"],
+    "cpp": ["cpp"],
+    "csharp": ["cs"],
+    "php": ["php"],
+    "ruby": ["rb"],
+    "perl": ["pl"],
+    "powershell": ["ps1"],
+    "batch": ["bat"],
+    "go": ["go"],
+    "rust": ["rs"],
+    "swift": ["swift"],
+    "kotlin": ["kt"],
+    "groovy": ["groovy"],
+    "scala": ["scala"],
+    "r": ["r"],
+    "dart": ["dart"],
+    "haskell": ["hs"],
+    "lua": ["lua"],
+    "elixir": ["ex"],
+    "clojure": ["clj"],
+}
+
+CWD = os.getcwd()
+
+
+def get_markdown_file_ext(
+    ext: Any,
+) -> str:
+    for language, extensions in ACCEPTED_MARKDOWN_FILE_EXT.items():
+        if ext in extensions:
+            return language
+    return ""
+
+
+def read_file(
+    file_path: Path,
+) -> str:
+    try:
+        return file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        return f"Error reading file {file_path}: {str(e)}"
+
+
+def format_content(
+    file_path: Path,
+    content: str,
+) -> str:
+    try:
+        rel_path = file_path.relative_to(CWD)
+    except ValueError:
+        rel_path = file_path
+
+    md_ext = get_markdown_file_ext(file_path.suffix.lstrip("."))
+    return f"---\n\nFile path: ./{rel_path}\n\n```{md_ext}\n{content}\n```"
+
+
+def process_files(
+    patterns: list[str],
+) -> str:
+    all_content = [BASE_PROMPT]
+    for pattern in patterns:
+        files = glob.glob(pattern, recursive=True)
+        if not files:
+            print(f"No files found matching pattern: {pattern}", file=sys.stderr)
+            continue
+        for file_path in map(Path, files):
+            content = read_file(file_path)
+            formatted_content = format_content(file_path, content)
+            all_content += [formatted_content]
+
+    return "\n\n".join(all_content)
+
+
+def copy_to_clipboard_mac(
+    content: str,
+) -> None:
+    try:
+        subprocess.run(["pbcopy"], input=content.encode("utf-8"), check=True)
+        print("File contents copied to clipboard in markdown format.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error copying to clipboard: {e}", file=sys.stderr)
+
+
+def copy_to_clipboard(
+    content: str,
+) -> None:
+    if platform == "darwin":
+        return copy_to_clipboard_mac(content)
+
+    try:
+        import pyperclip
+
+        pyperclip.copy(content)
+        print("File contents copied to clipboard in markdown format.")
+    except ImportError:
+        print("pyperclip is required to copy to clipboard on this platform.", file=sys.stderr)
+    except Exception:
+        print("Error copying to clipboard.", file=sys.stderr)
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Copy file contents to clipboard in markdown format.",
+    )
+    parser.add_argument("patterns", nargs="+", help="File paths or glob patterns")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_arguments()
+    all_content = process_files(args.patterns)
+    if all_content:
+        copy_to_clipboard(all_content)
+    else:
+        print("No content was copied to clipboard.", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
