@@ -104,6 +104,27 @@ def format_content(
     return f"---\n\nFile path: ./{rel_path}\n\n```{md_ext}\n{content}\n```"
 
 
+def process_directory(
+    dir_path: Path,
+) -> list[str]:
+    all_files = dir_path.rglob("*")
+    result = []
+    for file_path in all_files:
+        if file_path.is_file():
+            result.extend(process_file(file_path))
+        elif file_path.is_dir():
+            result.extend(process_directory(file_path))
+
+    return result
+
+
+def process_file(
+    file_path: Path,
+) -> list[str]:
+    content = read_file(file_path)
+    return [format_content(file_path, content)]
+
+
 def process_files(
     patterns: list[str],
 ) -> str:
@@ -113,10 +134,14 @@ def process_files(
         if not files:
             print(f"No files found matching pattern: {pattern}", file=sys.stderr)
             continue
+
         for file_path in map(Path, files):
-            content = read_file(file_path)
-            formatted_content = format_content(file_path, content)
-            all_content += [formatted_content]
+            if file_path.is_file():
+                result = process_file(file_path)
+            elif file_path.is_dir():
+                result = process_directory(file_path)
+
+            all_content += result
 
     return "\n\n".join(all_content)
 
