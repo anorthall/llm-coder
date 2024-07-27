@@ -151,7 +151,7 @@ def copy_to_clipboard_mac(
 ) -> None:
     try:
         subprocess.run(["pbcopy"], input=content.encode("utf-8"), check=True)
-        print("File contents copied to clipboard in markdown format.")
+        print("Copied prompt to clipboard! :)")
     except subprocess.CalledProcessError as e:
         print(f"Error copying to clipboard: {e}", file=sys.stderr)
 
@@ -166,7 +166,7 @@ def copy_to_clipboard(
         import pyperclip
 
         pyperclip.copy(content)
-        print("File contents copied to clipboard in markdown format.")
+        print("Copied prompt to clipboard! :)")
     except ImportError:
         print("pyperclip is required to copy to clipboard on this platform.", file=sys.stderr)
     except Exception:
