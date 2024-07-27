@@ -70,6 +70,12 @@ ACCEPTED_MARKDOWN_FILE_EXT = {
     "clojure": ["clj"],
 }
 
+ENCODING_TOKEN_MODEL = "gpt-4o"
+
+SKIP_EXTENSIONS = [
+    ".pyc"
+]
+
 CWD = os.getcwd()
 
 
@@ -79,16 +85,27 @@ def get_markdown_file_ext(
     for language, extensions in ACCEPTED_MARKDOWN_FILE_EXT.items():
         if ext in extensions:
             return language
+
     return ""
 
 
 def read_file(
     file_path: Path,
 ) -> str:
+    _, ext = os.path.splitext(file_path)
+
+    if ext.lower() in SKIP_EXTENSIONS:
+        return ""
+
     try:
-        return file_path.read_text(encoding="utf-8")
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        print(f"Skipping {file_path}: not utf-8")
     except Exception as e:
         return f"Error reading file {file_path}: {str(e)}"
+
+    return ""
 
 
 def format_content(
@@ -122,6 +139,10 @@ def process_file(
     file_path: Path,
 ) -> list[str]:
     content = read_file(file_path)
+
+    if not content:
+        return []
+
     return [format_content(file_path, content)]
 
 
@@ -180,10 +201,25 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("patterns", nargs="+", help="File paths or glob patterns")
     return parser.parse_args()
 
+def count_tokens(
+    content: str,
+    model: str = ENCODING_TOKEN_MODEL,
+) -> None:
+    import tiktoken
+    enc = tiktoken.encoding_for_model(model)
+    num_tokens = len(enc.encode(content))
+    print(f"Token count for {model}: {num_tokens}")
+
 
 def main() -> None:
     args = parse_arguments()
     all_content = process_files(args.patterns)
+
+    try:
+        count_tokens(all_content)
+    except ImportError:
+        pass
+
     if all_content:
         copy_to_clipboard(all_content)
     else:
